@@ -72,10 +72,20 @@
   .chip{background:var(--soft);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:12.5px;}
 
   /* history */
-  .his-row{display:flex;justify-content:space-between;align-items:center;padding:11px 4px;border-bottom:1px solid #f0f3f8;font-size:13.5px;}
-  .his-row .d{color:var(--muted);}
-  .his-row .v{font-weight:700;color:var(--ok);}
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0;}
+
+  .his-stats{display:flex;gap:10px;}
+  .his-stat{flex:1;background:var(--soft);border-radius:12px;padding:12px 6px;text-align:center;}
+  .his-stat .n{font-size:22px;font-weight:800;color:var(--accent);line-height:1.1;}
+  .his-stat .l{font-size:11px;color:var(--muted);margin-top:4px;}
+  .his-item{border-bottom:1px solid #f0f3f8;padding:10px 4px;cursor:pointer;}
+  .his-item:last-child{border-bottom:none;}
+  .his-row{display:flex;justify-content:space-between;align-items:center;font-size:13.5px;}
+  .his-row .d{color:var(--ink);font-weight:600;}
+  .his-row .v{font-weight:700;}
+  .his-bar{height:6px;background:#e8edf5;border-radius:999px;overflow:hidden;margin:8px 0 6px;}
+  .his-fill{height:100%;background:linear-gradient(90deg,#10b981,#34d399);border-radius:999px;transition:width .3s;}
+  .his-detail{font-size:11.5px;color:var(--muted);line-height:1.5;}
 
   /* bottom tab bar */
   .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--border);display:flex;padding:6px 0 calc(6px + env(safe-area-inset-bottom));z-index:10;}
@@ -126,6 +136,7 @@
 
   <!-- 记录 -->
   <div class="page" id="page-history">
+    <div class="card" id="hisStats"></div>
     <div class="card"><h3><span class="dot"></span>最近打卡记录</h3><div id="hisList"></div></div>
     <div class="card" style="text-align:center;">
       <div style="font-size:12px;color:var(--muted);">数据只存在你本机浏览器里，换设备/清缓存会清空。<br>想长期记录，请同步填写 Excel 训练日志。</div>
@@ -187,7 +198,6 @@ const PROG = [
    stretch:'猫牛式 → 婴儿式 → 眼镜蛇式腹部拉伸，各30s',
    moves:[['平板支撑','4 × 60–90秒','60秒','core'],['卷腹','4 × 20','45秒','core'],['俄罗斯转体','4 × 30','45秒','core'],['仰卧举腿','3 × 15','45秒','core'],['侧平板','3 × 30秒 / 侧','45秒','core'],['反向卷腹','3 × 15','45秒','core'],['慢跑 / 快走','25–30min','—','cardio']]},
   {d:'周六', kind:'rest', title:'休息 / 轻松有氧', desc:'散步、快走即可，别久坐'},
-  {d:'周日', kind:'rest', title:'休息', desc:'恢复优先，好好睡够 7–8 小时'},
 ];
 
 const LADDER = [
@@ -312,21 +322,46 @@ function renderLib(){
 // ===== 记录 =====
 function renderHistory(){
   const box=document.getElementById('hisList');
+  const stats=document.getElementById('hisStats');
   const rows=[];
+  let weekTrained=0, done14=0, total14=0;
+  const sun=new Date(); sun.setDate(sun.getDate()-sun.getDay());
+  for(let i=0;i<7;i++){
+    const d=new Date(sun); d.setDate(sun.getDate()+i);
+    const log=load(dateKey(d));
+    const p=PROG[d.getDay()];
+    if(p.kind==='train' && Object.keys(log).some(k=>log[k])) weekTrained++;
+  }
   for(let i=0;i<14;i++){
     const d=new Date();d.setDate(d.getDate()-i);
     const dk=dateKey(d);
     const log=load(dk);
-    const keys=Object.keys(log).filter(k=>log[k]);
     const p=PROG[d.getDay()];
+    const wd=WD[d.getDay()];
     if(p.kind==='rest'){
-      rows.push(`<div class="his-row"><span class="d">${dk.slice(5)} ${WD[d.getDay()]}</span><span class="v">休息</span></div>`);
+      rows.push(`<div class="his-item">
+        <div class="his-row"><span class="d">${dk.slice(5)} ${wd}</span><span class="v" style="color:#cbd5e1;">休息日</span></div>
+        <div class="his-detail">${p.desc}</div>
+      </div>`);
     }else{
-      const ok=keys.length;
-      rows.push(`<div class="his-row"><span class="d">${dk.slice(5)} ${WD[d.getDay()]}</span><span class="v" style="color:${ok? 'var(--ok)':'#cbd5e1'};">${ok}/${p.moves.length}</span></div>`);
+      const keys=Object.keys(log).filter(k=>log[k]);
+      const ok=keys.length, total=p.moves.length;
+      const pct=Math.round(ok/total*100);
+      done14+=ok; total14+=total;
+      const doneNames=ok? p.moves.filter((_,idx)=>log[idx]).map(m=>m[0]).join(' · ') : '未打卡';
+      rows.push(`<div class="his-item" onclick="goDay(${d.getDay()})">
+        <div class="his-row"><span class="d">${dk.slice(5)} ${wd}</span><span class="v" style="color:${ok?'var(--ok)':'#cbd5e1'};">${ok}/${total}</span></div>
+        <div class="his-bar"><div class="his-fill" style="width:${pct}%"></div></div>
+        <div class="his-detail">${doneNames}</div>
+      </div>`);
     }
   }
-  box.innerHTML=rows.join('') || '<div class="empty">还没有打卡记录</div>';
+  box.innerHTML=rows.join('');
+  stats.innerHTML=`<div class="his-stats">
+    <div class="his-stat"><div class="n">${weekTrained}</div><div class="l">本周已练(天)</div></div>
+    <div class="his-stat"><div class="n">${done14}</div><div class="l">14天完成动作</div></div>
+    <div class="his-stat"><div class="n">${total14?Math.round(done14/total14*100):0}%</div><div class="l">完成率</div></div>
+  </div>`;
 }
 
 // ===== 切换 =====
