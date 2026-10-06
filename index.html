@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<title>徒手塑形 · 训练助手</title>
+<style>
+  :root{
+    --ink:#1f2937;--muted:#6b7280;--soft:#f7f9fc;--border:#d9dee7;--accent:#2563eb;
+    --accent-soft:#eaf2ff;--core:#0ea5e9;--cardio:#f59e0b;--ok:#10b981;--bg:#eceff5;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);line-height:1.6;}
+  #app{max-width:480px;margin:0 auto;min-height:100vh;background:#f6f7fb;box-shadow:0 0 30px rgba(15,23,42,.12);position:relative;padding-bottom:76px;}
+
+  /* header */
+  .topbar{background:linear-gradient(135deg,#1e3a8a,#2563eb,#3b82f6);color:#fff;padding:18px 18px 22px;}
+  .topbar .hello{font-size:12px;opacity:.85;}
+  .topbar .date{font-size:20px;font-weight:700;margin-top:4px;}
+  .topbar .theme{margin-top:8px;font-size:13px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);display:inline-block;padding:4px 12px;border-radius:999px;font-weight:600;}
+
+  /* tab content */
+  .page{display:none;padding:16px 16px 0;}
+  .page.active{display:block;animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+  .card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(15,23,42,.05);}
+  .card h3{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  .card h3 .dot{width:8px;height:8px;border-radius:50%;background:var(--accent);display:inline-block;}
+
+  /* progress */
+  .progress-wrap{margin:6px 0 16px;}
+  .progress-bar{height:10px;background:#e8edf5;border-radius:999px;overflow:hidden;}
+  .progress-fill{height:100%;background:linear-gradient(90deg,#2563eb,#3b82f6);border-radius:999px;transition:width .3s ease;}
+  .progress-txt{font-size:12px;color:var(--muted);margin-top:6px;text-align:right;}
+
+  /* exercise list */
+  .ex{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid #f0f3f8;cursor:pointer;}
+  .ex:last-child{border-bottom:none;}
+  .ex .check{width:26px;height:26px;border-radius:50%;border:2px solid #cbd5e1;flex:0 0 26px;display:flex;align-items:center;justify-content:center;transition:all .2s;background:#fff;}
+  .ex.done .check{background:var(--ok);border-color:var(--ok);}
+  .ex .check svg{width:14px;height:14px;stroke:#fff;stroke-width:3;fill:none;opacity:0;transition:opacity .15s;}
+  .ex.done .check svg{opacity:1;}
+  .ex .info{flex:1;min-width:0;}
+  .ex .name{font-size:14.5px;font-weight:600;}
+  .ex.done .name{color:#94a3b8;text-decoration:line-through;}
+  .ex .meta{font-size:12px;color:var(--muted);margin-top:2px;}
+  .ex .badge{font-size:10px;padding:1px 6px;border-radius:999px;font-weight:700;margin-left:6px;vertical-align:1px;}
+  .b-core{background:#e0f2fe;color:#0369a1;}
+  .b-cardio{background:#fef3c7;color:#b45309;}
+
+  /* rest day */
+  .rest-box{text-align:center;padding:30px 10px;}
+  .rest-box .big{font-size:44px;margin-bottom:8px;}
+  .rest-box .t{font-size:17px;font-weight:700;}
+  .rest-box .d{font-size:13px;color:var(--muted);margin-top:6px;}
+
+  /* week overview */
+  .week-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);margin-bottom:8px;background:#fff;cursor:pointer;}
+  .week-row.today{border-color:var(--accent);background:var(--accent-soft);}
+  .week-row .wd{width:38px;height:38px;border-radius:10px;background:var(--soft);display:flex;flex-direction:column;align-items:center;justify-content:center;flex:0 0 38px;}
+  .week-row.today .wd{background:var(--accent);color:#fff;}
+  .week-row .wd b{font-size:13px;line-height:1;}
+  .week-row .wd span{font-size:10px;margin-top:3px;}
+  .week-row .wt{flex:1;font-size:13.5px;}
+  .week-row .wp{font-size:11px;color:var(--muted);margin-top:2px;}
+
+  /* lib */
+  .group-tag{font-size:12px;color:var(--muted);margin:14px 0 8px;font-weight:700;letter-spacing:.5px;}
+  .chip-wrap{display:flex;flex-wrap:wrap;gap:8px;}
+  .chip{background:var(--soft);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:12.5px;}
+
+  /* history */
+  .his-row{display:flex;justify-content:space-between;align-items:center;padding:11px 4px;border-bottom:1px solid #f0f3f8;font-size:13.5px;}
+  .his-row .d{color:var(--muted);}
+  .his-row .v{font-weight:700;color:var(--ok);}
+  .empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0;}
+
+  /* bottom tab bar */
+  .tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--border);display:flex;padding:6px 0 calc(6px + env(safe-area-inset-bottom));z-index:10;}
+  .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:#94a3b8;cursor:pointer;padding:4px 0;}
+  .tab svg{width:22px;height:22px;stroke:currentColor;stroke-width:1.8;fill:none;}
+  .tab.active{color:var(--accent);font-weight:700;}
+
+  .btn{display:block;width:100%;background:var(--accent);color:#fff;border:none;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;}
+  .btn:active{opacity:.9;}
+
+  .modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-end;justify-content:center;z-index:20;}
+  .modal.show{display:flex;}
+  .modal-card{background:#fff;border-radius:18px 18px 0 0;width:100%;max-width:480px;padding:18px 18px 28px;max-height:82vh;overflow:auto;}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:700;margin-bottom:6px;}
+  .m-close{width:28px;height:28px;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;color:var(--muted);line-height:1;}
+</style>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="训练助手">
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <div class="hello">徒手塑形 · 腹肌优先</div>
+    <div class="date" id="todayDate"></div>
+    <div class="theme" id="todayTheme"></div>
+  </div>
+
+  <!-- 今日 -->
+  <div class="page active" id="page-today">
+    <div id="todayContent"></div>
+  </div>
+
+  <!-- 一周 -->
+  <div class="page" id="page-week">
+    <div class="card"><h3><span class="dot"></span>本周安排</h3><div id="weekList"></div></div>
+    <div class="card"><h3><span class="dot"></span>徒手进阶阶梯</h3><div id="ladder"></div></div>
+  </div>
+
+  <!-- 动作库 -->
+  <div class="page" id="page-lib">
+    <div class="card"><h3><span class="dot"></span>动作库</h3><div id="libList"></div></div>
+  </div>
+
+  <!-- 记录 -->
+  <div class="page" id="page-history">
+    <div class="card"><h3><span class="dot"></span>最近打卡记录</h3><div id="hisList"></div></div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:12px;color:var(--muted);">数据只存在你本机浏览器里，换设备/清缓存会清空。<br>想长期记录，请同步填写 Excel 训练日志。</div>
+    </div>
+  </div>
+
+  <!-- tab bar -->
+  <div class="tabbar">
+    <div class="tab active" data-p="today">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>
+      今日
+    </div>
+    <div class="tab" data-p="week">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+      一周
+    </div>
+    <div class="tab" data-p="lib">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      动作库
+    </div>
+    <div class="tab" data-p="history">
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 3 3 9 9 9"/><line x1="12" y1="7" x2="12" y2="12"/><line x1="12" y1="12" x2="15" y2="14"/></svg>
+      记录
+    </div>
+  </div>
+
+  <!-- 查看某天详情弹窗 -->
+  <div id="modal" class="modal" onclick="hideModal(event)">
+    <div class="modal-card">
+      <div class="modal-head"><span id="modalTitle"></span><span class="m-close" onclick="event.stopPropagation();hideModal()">×</span></div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===== 数据 =====
+const PROG = [
+  {d:'周日', kind:'rest', title:'休息', desc:'恢复优先，好好睡够 7–8 小时'},
+  {d:'周一', kind:'train', title:'核心前置 + 上肢推（胸/肩/三头）+ 练后快走20min',
+   warmup:'肩绕环30次 → 手腕活动20次 → 跪姿俯卧撑×10 激活',
+   stretch:'门框扩胸30s×2 → 手臂过头上拉三头30s×2 → 腹部拉伸30s',
+   moves:[['卷腹','3 × 20','45秒','core'],['俄罗斯转体','3 × 30','45秒','core'],['宽距俯卧撑','4 × 15','90秒'],['钻石俯卧撑','4 × 10','90秒'],['下斜俯卧撑（脚垫高）','3 × 12','90秒'],['派克俯卧撑','3 × 10','90秒'],['椅背臂屈伸','3 × 12','60秒']]},
+  {d:'周二', kind:'train', title:'核心前置 + 下肢（徒手蹲类·轻量）',
+   warmup:'开合跳30次 → 徒手深蹲×10 → 弓步走20步',
+   stretch:'股四头肌30s×2 → 腿后侧30s×2 → 腹部拉伸30s',
+   moves:[['平板支撑','3 × 60秒','60秒','core'],['仰卧举腿','3 × 12','45秒','core'],['徒手深蹲','3 × 20','90秒'],['保加利亚分腿蹲','3 × 10 / 腿','90秒'],['臀桥','3 × 15','60秒']]},
+  {d:'周三', kind:'train', title:'核心 + 30min有氧',
+   warmup:'开合跳30次 → 原地慢跑2分钟 → 体侧屈10次',
+   stretch:'猫牛式 → 婴儿式 → 眼镜蛇式腹部拉伸，各30s',
+   moves:[['卷腹','3 × 20','45秒','core'],['俄罗斯转体','3 × 30','45秒','core'],['平板支撑','3 × 60秒','60秒','core'],['侧平板','2 × 30秒 / 侧','45秒','core'],['慢跑 / 快走','30min','—','cardio']]},
+  {d:'周四', kind:'train', title:'核心前置 + 上肢拉（背/二头）',
+   warmup:'肩胛后缩夹背20次 → 手臂绕环20次 → 猫牛式10次',
+   stretch:'背阔肌30s×2 → 二头30s×2 → 腹部拉伸30s',
+   moves:[['仰卧举腿','3 × 12','45秒','core'],['卷腹','3 × 15','45秒','core'],['桌下反向划船','4 × 12','90秒'],['引体 / 澳式引体','3 × 力竭','120秒'],['超人式','3 × 15','45秒'],['反向飞鸟（手持水瓶）','3 × 15','60秒']]},
+  {d:'周五', kind:'train', title:'核心强化 + 有氧（腹肌主练日）',
+   warmup:'开合跳30次 → 原地慢跑2分钟 → 体侧屈10次',
+   stretch:'猫牛式 → 婴儿式 → 眼镜蛇式腹部拉伸，各30s',
+   moves:[['平板支撑','4 × 60–90秒','60秒','core'],['卷腹','4 × 20','45秒','core'],['俄罗斯转体','4 × 30','45秒','core'],['仰卧举腿','3 × 15','45秒','core'],['侧平板','3 × 30秒 / 侧','45秒','core'],['反向卷腹','3 × 15','45秒','core'],['慢跑 / 快走','25–30min','—','cardio']]},
+  {d:'周六', kind:'rest', title:'休息 / 轻松有氧', desc:'散步、快走即可，别久坐'},
+  {d:'周日', kind:'rest', title:'休息', desc:'恢复优先，好好睡够 7–8 小时'},
+];
+
+const LADDER = [
+  ['胸','跪姿俯卧撑 → 标准 → 下斜/宽距 → 钻石'],
+  ['背','桌下反向划船 → 引体向上'],
+  ['肩','派克俯卧撑 → 靠墙倒立撑'],
+  ['手臂','椅背臂屈伸 → 钻石俯卧撑'],
+  ['核心','卷腹 → 举腿 → 反向卷腹 ｜ 平板 → 侧平板'],
+];
+
+const LIB = [
+  ['核心',['卷腹','仰卧举腿','反向卷腹','俄罗斯转体','平板支撑','侧平板']],
+  ['胸',['宽距俯卧撑','钻石俯卧撑','下斜俯卧撑','派克俯卧撑']],
+  ['背',['桌下反向划船','引体/澳式引体','超人式','反向飞鸟']],
+  ['腿',['徒手深蹲','保加利亚分腿蹲','臀桥']],
+  ['手臂',['椅背臂屈伸']],
+  ['有氧',['慢跑/快走','快走','慢跑']],
+];
+
+// ===== 工具 =====
+function dateKey(d){const y=d.getFullYear(),m=(''+ (d.getMonth()+1)).padStart(2,'0'),day=(''+d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
+function strKeyToday(){return dateKey(new Date());}
+function load(dk){try{return JSON.parse(localStorage.getItem('tlog-'+dk))||{};}catch(e){return {};}}
+function save(dk,o){try{localStorage.setItem('tlog-'+dk,JSON.stringify(o));}catch(e){}}
+const WD=['周日','周一','周二','周三','周四','周五','周六'];
+
+// ===== 今日页 =====
+function renderToday(){
+  const now=new Date();
+  const wd=now.getDay();
+  document.getElementById('todayDate').textContent=`${now.getMonth()+1}月${now.getDate()}日 · ${WD[wd]}`;
+  const p=PROG[wd];
+  document.getElementById('todayTheme').textContent=p.title;
+  const box=document.getElementById('todayContent');
+
+  if(p.kind==='rest'){
+    box.innerHTML=`<div class="card rest-box"><div class="big" style="color:#cbd5e1;"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></div><div class="t">${p.title}</div><div class="d">${p.desc}</div></div>`;
+    return;
+  }
+  const dk=strKeyToday();
+  const log=load(dk);
+  const total=p.moves.length;
+  const done=p.moves.filter((_,i)=>log[i]).length;
+  const pct=Math.round(done/total*100);
+
+  let html=`<div class="card">
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-txt">完成 ${done}/${total} · ${pct}%</div>
+    </div>
+    <div id="exList">`;
+  p.moves.forEach((m,i)=>{
+    const [name,rep,rest,type]=m;
+    const badge=type==='core'?'<span class="badge b-core">核心</span>':(type==='cardio'?'<span class="badge b-cardio">有氧</span>':'');
+    html+=`<div class="ex ${log[i]?'done':''}" onclick="toggle(${i})">
+      <div class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="info"><div class="name">${name}${badge}</div><div class="meta">${rep} · 组间休息 ${rest}</div></div>
+    </div>`;
+  });
+  html+=`</div></div>
+  <div class="card"><h3><span class="dot"></span>今日流程</h3>
+    <div style="font-size:13px;"><b style="color:var(--ok);">热身</b>：${p.warmup}</div>
+    <div style="font-size:13px;margin-top:8px;"><b style="color:var(--accent);">拉伸</b>：${p.stretch}</div>
+  </div>`;
+  box.innerHTML=html;
+}
+
+function toggle(i){
+  const dk=strKeyToday();
+  const log=load(dk);
+  log[i]=!log[i];
+  save(dk,log);
+  renderToday();
+}
+
+// ===== 一周页 =====
+function renderWeek(){
+  const today=new Date().getDay();
+  const list=document.getElementById('weekList');
+  list.innerHTML=PROG.map((p,i)=>{
+    const cls=i===today?'today':'';
+    const icon=p.kind==='rest'?'·':'·';
+    const sub=p.kind==='rest'?p.desc:`${p.moves.length} 个动作`;
+    return `<div class="week-row ${cls}" onclick="goDay(${i})">
+      <div class="wd"><b>${WD[i].replace('周','')}</b><span>${i===today?'今天':''}</span></div>
+      <div><div class="wt">${p.title.split('（')[0].split('+')[0]}</div><div class="wp">${sub}</div></div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('ladder').innerHTML=LADDER.map(([p,s])=>
+    `<div style="font-size:13px;padding:6px 0;border-bottom:1px solid #f0f3f8;"><b style="color:var(--accent);display:inline-block;width:44px;">${p}</b>${s}</div>`
+  ).join('');
+}
+
+function goDay(i){
+  const p=PROG[i];
+  document.getElementById('modalTitle').textContent=WD[i]+' · '+p.title.split('（')[0];
+  let b='';
+  if(p.kind==='rest'){
+    b=`<div class="rest-box"><div class="t">${p.title}</div><div class="d">${p.desc}</div></div>`;
+  }else{
+    p.moves.forEach(m=>{
+      const badge=m[3]==='core'?'<span class="badge b-core">核心</span>':(m[3]==='cardio'?'<span class="badge b-cardio">有氧</span>':'');
+      b+=`<div class="ex"><div class="info"><div class="name">${m[0]}${badge}</div><div class="meta">${m[1]} · 组间休息 ${m[2]}</div></div></div>`;
+    });
+  }
+  document.getElementById('modalBody').innerHTML=b;
+  document.getElementById('modal').classList.add('show');
+}
+function hideModal(e){
+  if(e && e.target.id!=='modal')return;
+  document.getElementById('modal').classList.remove('show');
+}
+
+// ===== 动作库 =====
+function renderLib(){
+  document.getElementById('libList').innerHTML=LIB.map(([g,items])=>
+    `<div class="group-tag">${g}</div><div class="chip-wrap">${items.map(x=>`<span class="chip">${x}</span>`).join('')}</div>`
+  ).join('');
+}
+
+// ===== 记录 =====
+function renderHistory(){
+  const box=document.getElementById('hisList');
+  const rows=[];
+  for(let i=0;i<14;i++){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const dk=dateKey(d);
+    const log=load(dk);
+    const keys=Object.keys(log).filter(k=>log[k]);
+    const p=PROG[d.getDay()];
+    if(p.kind==='rest'){
+      rows.push(`<div class="his-row"><span class="d">${dk.slice(5)} ${WD[d.getDay()]}</span><span class="v">休息</span></div>`);
+    }else{
+      const ok=keys.length;
+      rows.push(`<div class="his-row"><span class="d">${dk.slice(5)} ${WD[d.getDay()]}</span><span class="v" style="color:${ok? 'var(--ok)':'#cbd5e1'};">${ok}/${p.moves.length}</span></div>`);
+    }
+  }
+  box.innerHTML=rows.join('') || '<div class="empty">还没有打卡记录</div>';
+}
+
+// ===== 切换 =====
+function switchPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.p===name));
+  if(name==='history')renderHistory();
+  if(name==='week')renderWeek();
+  if(name==='lib')renderLib();
+}
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchPage(t.dataset.p)));
+
+// ===== 初始化 =====
+renderToday();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
