@@ -70,6 +70,7 @@
   .group-tag{font-size:12px;color:var(--muted);margin:14px 0 8px;font-weight:700;letter-spacing:.5px;}
   .chip-wrap{display:flex;flex-wrap:wrap;gap:8px;}
   .chip{background:var(--soft);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:12.5px;}
+  .chip-on{background:var(--accent);color:#fff;border-color:var(--accent);}
 
   /* history */
   .empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 0;}
@@ -125,7 +126,7 @@
 
   <!-- 一周 -->
   <div class="page" id="page-week">
-    <div class="card"><h3><span class="dot"></span>本周安排</h3><div id="weekList"></div></div>
+    <div class="card"><h3><span class="dot"></span>本周完成情况</h3><div id="weekList"></div></div>
     <div class="card"><h3><span class="dot"></span>徒手进阶阶梯</h3><div id="ladder"></div></div>
   </div>
 
@@ -175,29 +176,38 @@
 
 <script>
 // ===== 数据 =====
-const PROG = [
-  {d:'周日', kind:'rest', title:'休息', desc:'恢复优先，好好睡够 7–8 小时'},
-  {d:'周一', kind:'train', title:'核心前置 + 上肢推（胸/肩/三头）+ 练后快走20min',
-   warmup:'肩绕环30次 → 手腕活动20次 → 跪姿俯卧撑×10 激活',
-   stretch:'门框扩胸30s×2 → 手臂过头上拉三头30s×2 → 腹部拉伸30s',
-   moves:[['卷腹','3 × 20','45秒','core'],['俄罗斯转体','3 × 30','45秒','core'],['宽距俯卧撑','4 × 15','90秒'],['钻石俯卧撑','4 × 10','90秒'],['下斜俯卧撑（脚垫高）','3 × 12','90秒'],['派克俯卧撑','3 × 10','90秒'],['椅背臂屈伸','3 × 12','60秒']]},
-  {d:'周二', kind:'train', title:'核心前置 + 下肢（徒手蹲类·轻量）',
-   warmup:'开合跳30次 → 徒手深蹲×10 → 弓步走20步',
-   stretch:'股四头肌30s×2 → 腿后侧30s×2 → 腹部拉伸30s',
-   moves:[['平板支撑','3 × 60秒','60秒','core'],['仰卧举腿','3 × 12','45秒','core'],['徒手深蹲','3 × 20','90秒'],['保加利亚分腿蹲','3 × 10 / 腿','90秒'],['臀桥','3 × 15','60秒']]},
-  {d:'周三', kind:'train', title:'核心 + 30min有氧',
-   warmup:'开合跳30次 → 原地慢跑2分钟 → 体侧屈10次',
-   stretch:'猫牛式 → 婴儿式 → 眼镜蛇式腹部拉伸，各30s',
-   moves:[['卷腹','3 × 20','45秒','core'],['俄罗斯转体','3 × 30','45秒','core'],['平板支撑','3 × 60秒','60秒','core'],['侧平板','2 × 30秒 / 侧','45秒','core'],['慢跑 / 快走','30min','—','cardio']]},
-  {d:'周四', kind:'train', title:'核心前置 + 上肢拉（背/二头）',
-   warmup:'肩胛后缩夹背20次 → 手臂绕环20次 → 猫牛式10次',
-   stretch:'背阔肌30s×2 → 二头30s×2 → 腹部拉伸30s',
-   moves:[['仰卧举腿','3 × 12','45秒','core'],['卷腹','3 × 15','45秒','core'],['桌下反向划船','4 × 12','90秒'],['引体 / 澳式引体','3 × 力竭','120秒'],['超人式','3 × 15','45秒'],['反向飞鸟（手持水瓶）','3 × 15','60秒']]},
-  {d:'周五', kind:'train', title:'核心强化 + 有氧（腹肌主练日）',
-   warmup:'开合跳30次 → 原地慢跑2分钟 → 体侧屈10次',
-   stretch:'猫牛式 → 婴儿式 → 眼镜蛇式腹部拉伸，各30s',
-   moves:[['平板支撑','4 × 60–90秒','60秒','core'],['卷腹','4 × 20','45秒','core'],['俄罗斯转体','4 × 30','45秒','core'],['仰卧举腿','3 × 15','45秒','core'],['侧平板','3 × 30秒 / 侧','45秒','core'],['反向卷腹','3 × 15','45秒','core'],['慢跑 / 快走','25–30min','—','cardio']]},
-  {d:'周六', kind:'rest', title:'休息 / 轻松有氧', desc:'散步、快走即可，别久坐'},
+// 周任务额度（弹性 · 不绑星期几，一天选一个练）
+const QUOTA = { power:3, core:4, cardio:2 };
+
+// 训练模板池
+const SESSIONS = [
+  { id:'push', cat:'power', t:'上肢推（胸/肩/三头）',
+    warmup:'肩绕环30次 → 手腕活动20次 → 跪姿俯卧撑×10',
+    stretch:'门框扩胸30s×2 → 手臂过头上拉三头30s×2 → 腹部拉伸30s',
+    moves:[['卷腹','3 × 20','45秒','core'],['俄罗斯转体','3 × 30','45秒','core'],['宽距俯卧撑','4 × 15','90秒'],['钻石俯卧撑','4 × 10','90秒'],['下斜俯卧撑（脚垫高）','3 × 12','90秒'],['派克俯卧撑','3 × 10','90秒'],['椅背臂屈伸','3 × 12','60秒']] },
+  { id:'leg', cat:'power', t:'下肢（徒手蹲类·轻量）',
+    warmup:'开合跳30次 → 徒手深蹲×10 → 弓步走20步',
+    stretch:'股四头肌30s×2 → 腿后侧30s×2 → 腹部拉伸30s',
+    moves:[['平板支撑','3 × 60秒','60秒','core'],['仰卧举腿','3 × 12','45秒','core'],['徒手深蹲','3 × 20','90秒'],['保加利亚分腿蹲','3 × 10 / 腿','90秒'],['臀桥','3 × 15','60秒']] },
+  { id:'pull', cat:'power', t:'上肢拉（背/二头）',
+    warmup:'肩胛后缩夹背20次 → 手臂绕环20次 → 猫牛式10次',
+    stretch:'背阔肌30s×2 → 二头30s×2 → 腹部拉伸30s',
+    moves:[['仰卧举腿','3 × 12','45秒','core'],['卷腹','3 × 15','45秒','core'],['桌下反向划船','4 × 12','90秒'],['引体 / 澳式引体','3 × 力竭','120秒'],['超人式','3 × 15','45秒'],['反向飞鸟（手持水瓶）','3 × 15','60秒']] },
+  { id:'core', cat:'core', t:'核心强化（腹肌主练）',
+    warmup:'开合跳30次 → 原地慢跑2分钟 → 体侧屈10次',
+    stretch:'猫牛式 → 婴儿式 → 眼镜蛇式腹部拉伸，各30s',
+    moves:[['平板支撑','4 × 60–90秒','60秒','core'],['卷腹','4 × 20','45秒','core'],['俄罗斯转体','4 × 30','45秒','core'],['仰卧举腿','3 × 15','45秒','core'],['侧平板','3 × 30秒 / 侧','45秒','core'],['反向卷腹','3 × 15','45秒','core']] },
+  { id:'cardio', cat:'cardio', t:'有氧（快走 / 慢跑）',
+    warmup:'原地慢跑 2 分钟',
+    stretch:'股四头肌 + 腿后侧 各拉伸 30 秒',
+    moves:[['快走 / 慢跑','30 分钟','—','cardio']] },
+];
+
+// 15 分钟保底套餐（忙 / 应酬时用，做完算完成一次核心）
+const BAILOUT = [
+  ['平板支撑','3 × 60秒','60秒','core'],
+  ['卷腹','3 × 20','45秒','core'],
+  ['俄罗斯转体','3 × 30','45秒','core'],
 ];
 
 const LADDER = [
@@ -220,93 +230,156 @@ const LIB = [
 // ===== 工具 =====
 function dateKey(d){const y=d.getFullYear(),m=(''+ (d.getMonth()+1)).padStart(2,'0'),day=(''+d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`;}
 function strKeyToday(){return dateKey(new Date());}
-function load(dk){try{return JSON.parse(localStorage.getItem('tlog-'+dk))||{};}catch(e){return {};}}
+function load(dk){try{return JSON.parse(localStorage.getItem('tlog-'+dk))||null;}catch(e){return null;}}
 function save(dk,o){try{localStorage.setItem('tlog-'+dk,JSON.stringify(o));}catch(e){}}
 const WD=['周日','周一','周二','周三','周四','周五','周六'];
 
+// 本周一
+function weekStart(){
+  const n=new Date();
+  const d=new Date(n);
+  d.setDate(n.getDate()-((n.getDay()+6)%7));
+  return d;
+}
+// 本周 力量/核心/有氧 完成次数
+function weekCounts(){
+  const mon=weekStart();
+  const c={power:0,core:0,cardio:0};
+  for(let i=0;i<7;i++){
+    const d=new Date(mon); d.setDate(mon.getDate()+i);
+    const log=load(dateKey(d));
+    if(!log || !log.t) continue;
+    if(log.t==='core'||log.t==='bailout') c.core++;
+    else if(log.t==='cardio') c.cardio++;
+    else c.power++;
+  }
+  return c;
+}
+// 读当天记录（带默认结构）
+function getLog(dk){ const l=load(dk); return l && typeof l==='object' ? Object.assign({t:null,done:{}},l) : {t:null,done:{}}; }
+// 类型中文名
+function typeName(t){
+  if(!t) return '未打卡';
+  if(t==='bailout') return '核心·保底';
+  const s=SESSIONS.find(x=>x.id===t);
+  return s ? s.t : t;
+}
+// 某类型的动作总数 / 已完成数
+function typeTotal(t){ return t==='bailout' ? BAILOUT.length : (SESSIONS.find(x=>x.id===t)||{moves:[]}).moves.length; }
+function typeDone(log){ return log && log.done ? Object.keys(log.done).filter(k=>log.done[k]).length : 0; }
+
 // ===== 今日页 =====
+let curSession='push';
+
 function renderToday(){
   const now=new Date();
-  const wd=now.getDay();
-  document.getElementById('todayDate').textContent=`${now.getMonth()+1}月${now.getDate()}日 · ${WD[wd]}`;
-  const p=PROG[wd];
-  document.getElementById('todayTheme').textContent=p.title;
+  document.getElementById('todayDate').textContent=`${now.getMonth()+1}月${now.getDate()}日 · ${WD[now.getDay()]}`;
+  document.getElementById('todayTheme').textContent='本周额度 · 弹性安排';
   const box=document.getElementById('todayContent');
+  const c=weekCounts();
+  const log=getLog(strKeyToday());
 
-  if(p.kind==='rest'){
-    box.innerHTML=`<div class="card rest-box"><div class="big" style="color:#cbd5e1;"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></div><div class="t">${p.title}</div><div class="d">${p.desc}</div></div>`;
-    return;
-  }
-  const dk=strKeyToday();
-  const log=load(dk);
-  const total=p.moves.length;
-  const done=p.moves.filter((_,i)=>log[i]).length;
-  const pct=Math.round(done/total*100);
-
-  let html=`<div class="card">
-    <div class="progress-wrap">
+  // 1) 本周额度
+  let html=`<div class="card"><h3><span class="dot"></span>本周额度</h3>`;
+  [['power','力量',QUOTA.power],['core','核心',QUOTA.core],['cardio','有氧',QUOTA.cardio]].forEach(([k,label,goal])=>{
+    const val=Math.min(c[k],goal);
+    const pct=Math.round(val/goal*100);
+    const left=Math.max(0,goal-c[k]);
+    html+=`<div style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;"><b>${label}</b><span style="color:var(--muted);">${c[k]}/${goal}${left===0?' · 已达标':' · 还差 '+left+' 次'}</span></div>
       <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-      <div class="progress-txt">完成 ${done}/${total} · ${pct}%</div>
-    </div>
+    </div>`;
+  });
+  html+=`</div>`;
+
+  // 2) 今天练什么（模板选择）
+  html+=`<div class="card"><h3><span class="dot"></span>今天练什么（选一个）</h3><div class="chip-wrap">`;
+  SESSIONS.forEach(s=>{
+    html+=`<span class="chip ${curSession===s.id?'chip-on':''}" style="cursor:pointer;" onclick="pickSession('${s.id}')">${s.t}</span>`;
+  });
+  html+=`</div></div>`;
+
+  // 3) 选中模板的动作清单
+  const s=SESSIONS.find(x=>x.id===curSession);
+  const total=s.moves.length;
+  const ok=s.moves.filter((_,i)=>log.done['m'+i]).length;
+  const pct=Math.round(ok/total*100);
+  html+=`<div class="card">
+    <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+    <div class="progress-txt">${s.t} · ${ok}/${total}</div></div>
     <div id="exList">`;
-  p.moves.forEach((m,i)=>{
+  s.moves.forEach((m,i)=>{
     const [name,rep,rest,type]=m;
     const badge=type==='core'?'<span class="badge b-core">核心</span>':(type==='cardio'?'<span class="badge b-cardio">有氧</span>':'');
-    html+=`<div class="ex ${log[i]?'done':''}" onclick="toggle(${i})">
+    html+=`<div class="ex ${log.done['m'+i]?'done':''}" onclick="toggle(${i})">
       <div class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
       <div class="info"><div class="name">${name}${badge}</div><div class="meta">${rep} · 组间休息 ${rest}</div></div>
     </div>`;
   });
-  html+=`</div></div>
-  <div class="card"><h3><span class="dot"></span>今日流程</h3>
-    <div style="font-size:13px;"><b style="color:var(--ok);">热身</b>：${p.warmup}</div>
-    <div style="font-size:13px;margin-top:8px;"><b style="color:var(--accent);">拉伸</b>：${p.stretch}</div>
+  html+=`</div>
+    <div style="font-size:13px;margin-top:6px;"><b style="color:var(--ok);">热身</b>：${s.warmup}</div>
+    <div style="font-size:13px;margin-top:6px;"><b style="color:var(--accent);">拉伸</b>：${s.stretch}</div>
   </div>`;
+
+  // 4) 15 分钟保底套餐
+  html+=`<div class="card"><h3><span class="dot"></span>15 分钟保底套餐 <span style="font-size:11px;color:var(--muted);font-weight:400;">（忙 / 应酬时做这个）</span></h3>`;
+  BAILOUT.forEach((m,i)=>{
+    const [name,rep,rest]=m;
+    html+=`<div class="ex ${log.done['b'+i]?'done':''}" onclick="toggleBail(${i})">
+      <div class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="info"><div class="name">${name}<span class="badge b-core">核心</span></div><div class="meta">${rep} · 组间休息 ${rest}</div></div>
+    </div>`;
+  });
+  html+=`<div class="progress-txt">做完 3 个动作 = 完成一次核心</div></div>`;
+
   box.innerHTML=html;
 }
 
+function pickSession(id){ curSession=id; renderToday(); }
+
 function toggle(i){
   const dk=strKeyToday();
-  const log=load(dk);
-  log[i]=!log[i];
+  const log=getLog(dk);
+  log.t=curSession;
+  log.done['m'+i]=!log.done['m'+i];
+  save(dk,log);
+  renderToday();
+}
+
+function toggleBail(i){
+  const dk=strKeyToday();
+  const log=getLog(dk);
+  log.t='bailout';
+  log.done['b'+i]=!log.done['b'+i];
   save(dk,log);
   renderToday();
 }
 
 // ===== 一周页 =====
 function renderWeek(){
-  const today=new Date().getDay();
+  const mon=weekStart();
+  const todayKey=dateKey(new Date());
   const list=document.getElementById('weekList');
-  list.innerHTML=PROG.map((p,i)=>{
-    const cls=i===today?'today':'';
-    const icon=p.kind==='rest'?'·':'·';
-    const sub=p.kind==='rest'?p.desc:`${p.moves.length} 个动作`;
-    return `<div class="week-row ${cls}" onclick="goDay(${i})">
-      <div class="wd"><b>${WD[i].replace('周','')}</b><span>${i===today?'今天':''}</span></div>
-      <div><div class="wt">${p.title.split('（')[0].split('+')[0]}</div><div class="wp">${sub}</div></div>
-    </div>`;
-  }).join('');
+  const rows=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(mon); d.setDate(mon.getDate()+i);
+    const dk=dateKey(d);
+    const log=load(dk);
+    const t=log && log.t ? log.t : null;
+    const isToday=dk===todayKey;
+    const cls=isToday?'today':'';
+    rows.push(`<div class="week-row ${cls}">
+      <div class="wd"><b>${WD[d.getDay()].replace('周','')}</b><span>${isToday?'今天':''}</span></div>
+      <div><div class="wt">${t?typeName(t):'未练'}</div><div class="wp">${t?typeDone(log)+'/'+typeTotal(t)+' 个动作':'休息 / 还没练'}</div></div>
+    </div>`);
+  }
+  list.innerHTML=rows.join('');
 
   document.getElementById('ladder').innerHTML=LADDER.map(([p,s])=>
     `<div style="font-size:13px;padding:6px 0;border-bottom:1px solid #f0f3f8;"><b style="color:var(--accent);display:inline-block;width:44px;">${p}</b>${s}</div>`
   ).join('');
 }
 
-function goDay(i){
-  const p=PROG[i];
-  document.getElementById('modalTitle').textContent=WD[i]+' · '+p.title.split('（')[0];
-  let b='';
-  if(p.kind==='rest'){
-    b=`<div class="rest-box"><div class="t">${p.title}</div><div class="d">${p.desc}</div></div>`;
-  }else{
-    p.moves.forEach(m=>{
-      const badge=m[3]==='core'?'<span class="badge b-core">核心</span>':(m[3]==='cardio'?'<span class="badge b-cardio">有氧</span>':'');
-      b+=`<div class="ex"><div class="info"><div class="name">${m[0]}${badge}</div><div class="meta">${m[1]} · 组间休息 ${m[2]}</div></div></div>`;
-    });
-  }
-  document.getElementById('modalBody').innerHTML=b;
-  document.getElementById('modal').classList.add('show');
-}
 function hideModal(e){
   if(e && e.target.id!=='modal')return;
   document.getElementById('modal').classList.remove('show');
@@ -323,44 +396,34 @@ function renderLib(){
 function renderHistory(){
   const box=document.getElementById('hisList');
   const stats=document.getElementById('hisStats');
+  const c=weekCounts();
   const rows=[];
-  let weekTrained=0, done14=0, total14=0;
-  const sun=new Date(); sun.setDate(sun.getDate()-sun.getDay());
-  for(let i=0;i<7;i++){
-    const d=new Date(sun); d.setDate(sun.getDate()+i);
-    const log=load(dateKey(d));
-    const p=PROG[d.getDay()];
-    if(p.kind==='train' && Object.keys(log).some(k=>log[k])) weekTrained++;
-  }
   for(let i=0;i<14;i++){
     const d=new Date();d.setDate(d.getDate()-i);
     const dk=dateKey(d);
     const log=load(dk);
-    const p=PROG[d.getDay()];
+    const t=log && log.t ? log.t : null;
     const wd=WD[d.getDay()];
-    if(p.kind==='rest'){
+    if(!t){
       rows.push(`<div class="his-item">
-        <div class="his-row"><span class="d">${dk.slice(5)} ${wd}</span><span class="v" style="color:#cbd5e1;">休息日</span></div>
-        <div class="his-detail">${p.desc}</div>
+        <div class="his-row"><span class="d">${dk.slice(5)} ${wd}</span><span class="v" style="color:#cbd5e1;">—</span></div>
+        <div class="his-detail">未打卡</div>
       </div>`);
     }else{
-      const keys=Object.keys(log).filter(k=>log[k]);
-      const ok=keys.length, total=p.moves.length;
-      const pct=Math.round(ok/total*100);
-      done14+=ok; total14+=total;
-      const doneNames=ok? p.moves.filter((_,idx)=>log[idx]).map(m=>m[0]).join(' · ') : '未打卡';
-      rows.push(`<div class="his-item" onclick="goDay(${d.getDay()})">
-        <div class="his-row"><span class="d">${dk.slice(5)} ${wd}</span><span class="v" style="color:${ok?'var(--ok)':'#cbd5e1'};">${ok}/${total}</span></div>
+      const ok=typeDone(log), total=typeTotal(log.t);
+      const pct=total?Math.round(ok/total*100):0;
+      rows.push(`<div class="his-item">
+        <div class="his-row"><span class="d">${dk.slice(5)} ${wd}</span><span class="v" style="color:var(--ok);">${typeName(log.t)}</span></div>
         <div class="his-bar"><div class="his-fill" style="width:${pct}%"></div></div>
-        <div class="his-detail">${doneNames}</div>
+        <div class="his-detail">${ok}/${total} 个动作完成</div>
       </div>`);
     }
   }
   box.innerHTML=rows.join('');
   stats.innerHTML=`<div class="his-stats">
-    <div class="his-stat"><div class="n">${weekTrained}</div><div class="l">本周已练(天)</div></div>
-    <div class="his-stat"><div class="n">${done14}</div><div class="l">14天完成动作</div></div>
-    <div class="his-stat"><div class="n">${total14?Math.round(done14/total14*100):0}%</div><div class="l">完成率</div></div>
+    <div class="his-stat"><div class="n">${c.power}/${QUOTA.power}</div><div class="l">本周力量</div></div>
+    <div class="his-stat"><div class="n">${c.core}/${QUOTA.core}</div><div class="l">本周核心</div></div>
+    <div class="his-stat"><div class="n">${c.cardio}/${QUOTA.cardio}</div><div class="l">本周有氧</div></div>
   </div>`;
 }
 
