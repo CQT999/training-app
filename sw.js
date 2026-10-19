@@ -1,4 +1,4 @@
-const CACHE = 'trainee-v2';
+const CACHE = 'trainee-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -10,7 +10,10 @@ const ASSETS = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE).then((c) =>
+      // 逐条缓存并容错：单个资源失败不会拖垮整个缓存
+      Promise.allSettled(ASSETS.map((a) => c.add(a)))
+    ).then(() => self.skipWaiting())
   );
 });
 
