@@ -247,16 +247,23 @@ function weekCounts(){
   const c={power:0,core:0,cardio:0};
   for(let i=0;i<7;i++){
     const d=new Date(mon); d.setDate(mon.getDate()+i);
-    const log=load(dateKey(d));
-    if(!log || !log.t) continue;
-    if(log.t==='core'||log.t==='bailout') c.core++;
-    else if(log.t==='cardio') c.cardio++;
-    else c.power++;
+    const log=getLog(dateKey(d));
+    Object.keys(log.sessions).forEach(sid=>{
+      if(sid==='core'||sid==='bailout') c.core++;
+      else if(sid==='cardio') c.cardio++;
+      else c.power++;
+    });
   }
   return c;
 }
-// 读当天记录（带默认结构）
-function getLog(dk){ const l=load(dk); return l && typeof l==='object' ? Object.assign({t:null,done:{}},l) : {t:null,done:{}}; }
+// 读当天记录（自动迁移旧单项目格式 → 多项目格式）
+function getLog(dk){
+  const l=load(dk);
+  if(!l || typeof l!=='object') return {sessions:{}};
+  if(l.sessions) return l;
+  if(l.t){ return {sessions:{ [l.t]: {done:l.done||{}} }}; }
+  return {sessions:{}};
+}
 // 类型中文名
 function typeName(t){
   if(!t) return '未打卡';
@@ -266,10 +273,10 @@ function typeName(t){
 }
 // 某类型的动作总数 / 已完成数
 function typeTotal(t){ return t==='bailout' ? BAILOUT.length : (SESSIONS.find(x=>x.id===t)||{moves:[]}).moves.length; }
-function typeDone(log){ return log && log.done ? Object.keys(log.done).filter(k=>log.done[k]).length : 0; }
+function typeDone(log, sid){ const s=log && log.sessions ? log.sessions[sid] : null; return s && s.done ? Object.keys(s.done).filter(k=>s.done[k]).length : 0; }
 
 // ===== 今日页 =====
-let curSession='push';
+let selected=[];   // 今天勾选要练的项目（可多选）
 
 function renderToday(){
   const now=new Date();
@@ -292,40 +299,45 @@ function renderToday(){
   });
   html+=`</div>`;
 
-  // 2) 今天练什么（模板选择）
-  html+=`<div class="card"><h3><span class="dot"></span>今天练什么（选一个）</h3><div class="chip-wrap">`;
+  // 2) 今天练什么（可多选）
+  html+=`<div class="card"><h3><span class="dot"></span>今天练什么（可多选）</h3><div class="chip-wrap">`;
   SESSIONS.forEach(s=>{
-    html+=`<span class="chip ${curSession===s.id?'chip-on':''}" style="cursor:pointer;" onclick="pickSession('${s.id}')">${s.t}</span>`;
+    html+=`<span class="chip ${selected.includes(s.id)?'chip-on':''}" style="cursor:pointer;" onclick="pickSession('${s.id}')">${s.t}</span>`;
   });
   html+=`</div></div>`;
 
-  // 3) 选中模板的动作清单
-  const s=SESSIONS.find(x=>x.id===curSession);
-  const total=s.moves.length;
-  const ok=s.moves.filter((_,i)=>log.done['m'+i]).length;
-  const pct=Math.round(ok/total*100);
-  html+=`<div class="card">
-    <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
-    <div class="progress-txt">${s.t} · ${ok}/${total}</div></div>
-    <div id="exList">`;
-  s.moves.forEach((m,i)=>{
-    const [name,rep,rest,type]=m;
-    const badge=type==='core'?'<span class="badge b-core">核心</span>':(type==='cardio'?'<span class="badge b-cardio">有氧</span>':'');
-    html+=`<div class="ex ${log.done['m'+i]?'done':''}" onclick="toggle(${i})">
-      <div class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
-      <div class="info"><div class="name">${name}${badge}</div><div class="meta">${rep} · 组间休息 ${rest}</div></div>
+  // 3) 每个选中项目的动作清单
+  selected.forEach(sid=>{
+    const s=SESSIONS.find(x=>x.id===sid);
+    if(!s) return;
+    const sess=log.sessions[sid]||{done:{}};
+    const total=s.moves.length;
+    const ok=typeDone(log,sid);
+    const pct=total?Math.round(ok/total*100):0;
+    html+=`<div class="card">
+      <div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+      <div class="progress-txt">${s.t} · ${ok}/${total}</div></div>
+      <div>`;
+    s.moves.forEach((m,i)=>{
+      const [name,rep,rest,type]=m;
+      const badge=type==='core'?'<span class="badge b-core">核心</span>':(type==='cardio'?'<span class="badge b-cardio">有氧</span>':'');
+      html+=`<div class="ex ${sess.done['m'+i]?'done':''}" onclick="toggle('${sid}',${i})">
+        <div class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <div class="info"><div class="name">${name}${badge}</div><div class="meta">${rep} · 组间休息 ${rest}</div></div>
+      </div>`;
+    });
+    html+=`</div>
+      <div style="font-size:13px;margin-top:6px;"><b style="color:var(--ok);">热身</b>：${s.warmup}</div>
+      <div style="font-size:13px;margin-top:6px;"><b style="color:var(--accent);">拉伸</b>：${s.stretch}</div>
     </div>`;
   });
-  html+=`</div>
-    <div style="font-size:13px;margin-top:6px;"><b style="color:var(--ok);">热身</b>：${s.warmup}</div>
-    <div style="font-size:13px;margin-top:6px;"><b style="color:var(--accent);">拉伸</b>：${s.stretch}</div>
-  </div>`;
 
   // 4) 15 分钟保底套餐
+  const bail=log.sessions['bailout']||{done:{}};
   html+=`<div class="card"><h3><span class="dot"></span>15 分钟保底套餐 <span style="font-size:11px;color:var(--muted);font-weight:400;">（忙 / 应酬时做这个）</span></h3>`;
   BAILOUT.forEach((m,i)=>{
     const [name,rep,rest]=m;
-    html+=`<div class="ex ${log.done['b'+i]?'done':''}" onclick="toggleBail(${i})">
+    html+=`<div class="ex ${bail.done['b'+i]?'done':''}" onclick="toggle('bailout',${i})">
       <div class="check"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg></div>
       <div class="info"><div class="name">${name}<span class="badge b-core">核心</span></div><div class="meta">${rep} · 组间休息 ${rest}</div></div>
     </div>`;
@@ -335,22 +347,18 @@ function renderToday(){
   box.innerHTML=html;
 }
 
-function pickSession(id){ curSession=id; renderToday(); }
-
-function toggle(i){
-  const dk=strKeyToday();
-  const log=getLog(dk);
-  log.t=curSession;
-  log.done['m'+i]=!log.done['m'+i];
-  save(dk,log);
+function pickSession(id){
+  const i=selected.indexOf(id);
+  if(i>=0) selected.splice(i,1); else selected.push(id);
   renderToday();
 }
 
-function toggleBail(i){
+function toggle(sid, i){
   const dk=strKeyToday();
   const log=getLog(dk);
-  log.t='bailout';
-  log.done['b'+i]=!log.done['b'+i];
+  if(!log.sessions[sid]) log.sessions[sid]={done:{}};
+  const key=(sid==='bailout'?'b':'m')+i;
+  log.sessions[sid].done[key]=!log.sessions[sid].done[key];
   save(dk,log);
   renderToday();
 }
@@ -364,14 +372,24 @@ function renderWeek(){
   for(let i=0;i<7;i++){
     const d=new Date(mon); d.setDate(mon.getDate()+i);
     const dk=dateKey(d);
-    const log=load(dk);
-    const t=log && log.t ? log.t : null;
+    const log=getLog(dk);
+    const sids=Object.keys(log.sessions);
     const isToday=dk===todayKey;
     const cls=isToday?'today':'';
-    rows.push(`<div class="week-row ${cls}">
-      <div class="wd"><b>${WD[d.getDay()].replace('周','')}</b><span>${isToday?'今天':''}</span></div>
-      <div><div class="wt">${t?typeName(t):'未练'}</div><div class="wp">${t?typeDone(log)+'/'+typeTotal(t)+' 个动作':'休息 / 还没练'}</div></div>
-    </div>`);
+    if(sids.length===0){
+      rows.push(`<div class="week-row ${cls}">
+        <div class="wd"><b>${WD[d.getDay()].replace('周','')}</b><span>${isToday?'今天':''}</span></div>
+        <div><div class="wt">未练</div><div class="wp">休息 / 还没练</div></div>
+      </div>`);
+    }else{
+      const names=sids.map(sid=>typeName(sid)).join(' · ');
+      const doCount=sids.reduce((a,sid)=>a+typeDone(log,sid),0);
+      const totCount=sids.reduce((a,sid)=>a+typeTotal(sid),0);
+      rows.push(`<div class="week-row ${cls}">
+        <div class="wd"><b>${WD[d.getDay()].replace('周','')}</b><span>${isToday?'今天':''}</span></div>
+        <div><div class="wt">${names}</div><div class="wp">${doCount}/${totCount} 个动作</div></div>
+      </div>`);
+    }
   }
   list.innerHTML=rows.join('');
 
@@ -401,22 +419,24 @@ function renderHistory(){
   for(let i=0;i<14;i++){
     const d=new Date();d.setDate(d.getDate()-i);
     const dk=dateKey(d);
-    const log=load(dk);
-    const t=log && log.t ? log.t : null;
+    const log=getLog(dk);
+    const sids=Object.keys(log.sessions);
     const wd=WD[d.getDay()];
-    if(!t){
+    if(sids.length===0){
       rows.push(`<div class="his-item">
         <div class="his-row"><span class="d">${dk.slice(5)} ${wd}</span><span class="v" style="color:#cbd5e1;">—</span></div>
         <div class="his-detail">未打卡</div>
       </div>`);
     }else{
-      const ok=typeDone(log), total=typeTotal(log.t);
-      const pct=total?Math.round(ok/total*100):0;
-      rows.push(`<div class="his-item">
-        <div class="his-row"><span class="d">${dk.slice(5)} ${wd}</span><span class="v" style="color:var(--ok);">${typeName(log.t)}</span></div>
-        <div class="his-bar"><div class="his-fill" style="width:${pct}%"></div></div>
-        <div class="his-detail">${ok}/${total} 个动作完成</div>
-      </div>`);
+      sids.forEach((sid,idx)=>{
+        const ok=typeDone(log,sid), total=typeTotal(sid);
+        const pct=total?Math.round(ok/total*100):0;
+        rows.push(`<div class="his-item">
+          <div class="his-row"><span class="d">${idx===0?`${dk.slice(5)} ${wd}`:''}</span><span class="v" style="color:var(--ok);">${typeName(sid)}</span></div>
+          <div class="his-bar"><div class="his-fill" style="width:${pct}%"></div></div>
+          <div class="his-detail">${ok}/${total} 个动作完成</div>
+        </div>`);
+      });
     }
   }
   box.innerHTML=rows.join('');
@@ -439,6 +459,8 @@ function switchPage(name){
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>switchPage(t.dataset.p)));
 
 // ===== 初始化 =====
+// 打开时自动把今天已记录的项目勾选上，进度直接可见
+selected=Object.keys(getLog(strKeyToday()).sessions).filter(id=>SESSIONS.some(s=>s.id===id));
 renderToday();
 
 if ('serviceWorker' in navigator) {
